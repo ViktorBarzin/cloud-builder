@@ -101,6 +101,9 @@ Cloud then says the builder stopped and to push again.
 
 Cloud dispatches with its own token (Vault `secret/cloud/system`, key
 `github_dispatch_token`), which needs Actions read and write on this repo.
+It also reads this repo's visibility with that token: while the repo is
+public its minutes are free, and Cloud does not stop builds when the
+account's private minutes run low.
 Cloud's log identity is `build_log_key` in the same Vault path; it never
 comes here.
 

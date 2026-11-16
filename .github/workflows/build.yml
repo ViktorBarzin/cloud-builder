@@ -451,10 +451,16 @@ jobs:
           exec 2>>"$log"
           job="$RUNNER_TEMP/job.json"
           tag="$(jq -r '.image' "$job"):$(jq -r '.sha' "$job")"
-          if timeout --signal=TERM 5m docker push "$tag" >> "$log"; then
-            echo "cloud: pushed $tag" >> "$log"
-            exit 0
-          fi
+          # ghcr sometimes answers "unknown blob" when two builds push the
+          # same base layers at once; a second try then goes through.
+          for attempt in 1 2 3; do
+            if timeout --signal=TERM 5m docker push "$tag" >> "$log"; then
+              echo "cloud: pushed $tag" >> "$log"
+              exit 0
+            fi
+            echo "cloud: push attempt $attempt failed" >> "$log"
+            [ "$attempt" -lt 3 ] && sleep "${PUSH_RETRY_SECONDS:-15}"
+          done
           echo "cloud: the push failed" >> "$log"
           echo "::error title=Cloud::the push failed"
           exit 1
