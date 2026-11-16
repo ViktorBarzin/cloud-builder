@@ -28,7 +28,7 @@ which the log prints.
 | Job | What it does | What it can see |
 |---|---|---|
 | `fetch` | opens and checks the job, checks out exactly `sha` from `repo_url`, deletes `.git`, seals the tree and uploads it | its first step gets `CLOUD_JOB_KEY`. Only its fetch step gets a repository token: `FORGEJO_READ_TOKEN` for `source: forgejo`, `GH_OWNER_READ_TOKEN` for `source: github-owner`, none for `public`. A token is sent only to forgejo.viktorbarzin.me or github.com, as a header scoped to that host, with no system or user git config (so no Git LFS filter runs) and none at all for a checkout that needs no network |
-| `build` | opens the job and the tree, builds it with the repo's `Dockerfile`, else Railpack 0.43.0, and pushes `<image>:<sha>` to ghcr, labelled with this repo as `org.opencontainers.image.source` | its first step gets `CLOUD_JOB_KEY`; no repository token; `GITHUB_TOKEN` with `packages: write` only |
+| `build` | opens the job and the tree (with git's modes, 644 and 755, so an image that copies it in as root can still read it as its App's user), builds it with the repo's `Dockerfile`, else Railpack 0.43.0, and pushes `<image>:<sha>` to ghcr, labelled with this repo as `org.opencontainers.image.source` | its first step gets `CLOUD_JOB_KEY`; no repository token; `GITHUB_TOKEN` with `packages: write` only |
 
 Each job stops after 20 minutes. Cloud cancels a run that a newer push
 overtook; the workflow has no concurrency group, since one named after the

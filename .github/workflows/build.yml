@@ -172,6 +172,9 @@ jobs:
           git_safe=(git -c protocol.allow=never -c protocol.https.allow=always
             -c http.followRedirects=false -c credential.helper=
             -c filter.lfs.smudge= -c filter.lfs.process= -c filter.lfs.required=false)
+          # Git's modes in the tree whatever umask the runner has: 644, and
+          # 755 for executables and directories.
+          umask 022
           git init -q tree >> "$log"
           cd tree
           if "${git_safe[@]}" fetch -q --depth 1 --no-tags -- "$REPO_URL" "$SHA" >> "$log"; then
@@ -287,9 +290,15 @@ jobs:
           [[ "$(jq -r '.image' "$job")" =~ $image_re ]] || refuse
           [[ "$(jq -r '.log_recipient' "$job")" =~ ^age1[02-9ac-hj-np-z]{58}$ ]] || refuse
           jq -e '(.build_env // {}) | type == "object" and all(to_entries[]; (.key | test("\\A[A-Za-z_][A-Za-z0-9_]*\\z")) and (.key | test("\\A(PATH|LD_.*|DOCKER_.*|BUILDX_.*|BUILDKIT_.*|HTTP_PROXY|HTTPS_PROXY|NO_PROXY|ALL_PROXY|NODE_OPTIONS|BUN_.*|RAILPACK_CONFIG_FILE)\\z"; "i") | not) and (.value | type == "string" and (explode | index(0)) == null))' "$job" >/dev/null || refuse
-          mkdir tree
-          "$RUNNER_TEMP/age/age" -d -i <(printf '%s\n' "$CLOUD_JOB_KEY") "$RUNNER_TEMP/artifact/tree.tgz.age" \
-            | tar -xzf - -C tree 2>> "$RUNNER_TEMP/build.log" || refuse
+          # The tree keeps git's modes (644, 755 for executables and
+          # directories), not this step's umask 077: the image copies it in
+          # as root and its App runs as another user, which must read it.
+          mkdir -m 755 tree
+          (
+            umask 022
+            "$RUNNER_TEMP/age/age" -d -i <(printf '%s\n' "$CLOUD_JOB_KEY") "$RUNNER_TEMP/artifact/tree.tgz.age" \
+              | tar -xzpf - --no-same-owner -C tree 2>> "$RUNNER_TEMP/build.log"
+          ) || refuse
           unset CLOUD_JOB_KEY INPUT_JOB
           rm -rf "$RUNNER_TEMP/artifact"
           # The build env, one mode-600 file per name, for Railpack's
